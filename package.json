@@ -1,0 +1,260 @@
+{
+  "name": "taskforge",
+  "displayName": "TaskForge",
+  "description": "A customizable productivity forge for tasks, todos, notes, goals, and plans with Kanban, charts, and Git sync.",
+  "version": "0.3.1",
+  "publisher": "AnandShah",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AnandShah10/CodePartner.git"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:taskForge",
+    "onCommand:taskForge.*"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "taskForge",
+          "title": "TaskForge",
+          "icon": "media/icon.png"
+        }
+      ]
+    },
+    "views": {
+      "taskForge": [
+        {
+          "id": "hubView",
+          "name": "Hub",
+          "type": "tree"
+        },
+        {
+          "id": "todosView",
+          "name": "Todos",
+          "type": "tree"
+        },
+        {
+          "id": "notesView",
+          "name": "Notes",
+          "type": "tree"
+        },
+        {
+          "id": "tasksView",
+          "name": "Tasks",
+          "type": "tree"
+        },
+        {
+          "id": "goalsView",
+          "name": "Goals",
+          "type": "tree"
+        },
+        {
+          "id": "plansView",
+          "name": "Plans",
+          "type": "tree"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "taskForge.addTodo",
+        "title": "Add Todo"
+      },
+      {
+        "command": "taskForge.addNote",
+        "title": "Add Note"
+      },
+      {
+        "command": "taskForge.addTask",
+        "title": "Add Task"
+      },
+      {
+        "command": "taskForge.addGoal",
+        "title": "Add Goal"
+      },
+      {
+        "command": "taskForge.addPlan",
+        "title": "Add Plan"
+      },
+      {
+        "command": "taskForge.openKanban",
+        "title": "Open Kanban Board"
+      },
+      {
+        "command": "taskForge.viewGoalsChart",
+        "title": "View Goals Chart"
+      },
+      {
+        "command": "taskForge.exportToGit",
+        "title": "Export to Git (.taskforge.json)"
+      },
+      {
+        "command": "taskForge.importFromGit",
+        "title": "Import from Git (.taskforge.json)"
+      },
+      {
+        "command": "taskForge.searchItems",
+        "title": "Search Items"
+      },
+      {
+        "command": "taskForge.deleteItem",
+        "title": "Delete Item"
+      },
+      {
+        "command": "taskForge.toggleItem",
+        "title": "Toggle Item Status"
+      },
+      {
+        "command": "taskForge.refresh",
+        "title": "Refresh TaskForge Views"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "taskForge.addTodo",
+          "when": "view == todosView",
+          "group": "navigation"
+        },
+        {
+          "command": "taskForge.addNote",
+          "when": "view == notesView",
+          "group": "navigation"
+        },
+        {
+          "command": "taskForge.addTask",
+          "when": "view == tasksView",
+          "group": "navigation"
+        },
+        {
+          "command": "taskForge.addGoal",
+          "when": "view == goalsView",
+          "group": "navigation"
+        },
+        {
+          "command": "taskForge.addPlan",
+          "when": "view == plansView",
+          "group": "navigation"
+        },
+        {
+          "command": "taskForge.openKanban",
+          "when": "view == tasksView",
+          "group": "navigation"
+        },
+        {
+          "command": "taskForge.viewGoalsChart",
+          "when": "view == goalsView",
+          "group": "navigation"
+        },
+        {
+          "command": "taskForge.refresh",
+          "when": "view == hubView || view == todosView || view == notesView || view == tasksView || view == goalsView || view == plansView",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "taskForge.editItem",
+          "when": "view == todosView || view == notesView || view == tasksView || view == goalsView || view == plansView",
+          "group": "navigation"
+        },
+        {
+          "command": "taskForge.toggleItem",
+          "when": "view == todosView || view == tasksView",
+          "group": "navigation"
+        },
+        {
+          "command": "taskForge.deleteItem",
+          "when": "view == todosView || view == notesView || view == tasksView || view == goalsView || view == plansView",
+          "group": "navigation"
+        }
+      ],
+      "view/container/title": [
+        {
+          "command": "taskForge.exportToGit",
+          "when": "viewContainer == taskForge",
+          "group": "navigation"
+        },
+        {
+          "command": "taskForge.importFromGit",
+          "when": "viewContainer == taskForge",
+          "group": "navigation"
+        },
+        {
+          "command": "taskForge.searchItems",
+          "when": "viewContainer == taskForge",
+          "group": "navigation"
+        },
+        {
+          "command": "taskForge.refresh",
+          "when": "viewContainer == taskForge",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "TaskForge",
+      "properties": {
+        "taskForge.theme": {
+          "type": "string",
+          "default": "default",
+          "enum": [
+            "default",
+            "dark",
+            "light",
+            "custom"
+          ],
+          "description": "Theme for TaskForge views and webviews."
+        },
+        "taskForge.autoSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-save changes."
+        },
+        "taskForge.autoGitSync": {
+          "type": "boolean",
+          "default": false,
+          "description": "Prompt to export on save (for Git sync)."
+        },
+        "taskForge.maxItems": {
+          "type": "number",
+          "default": 100,
+          "description": "Max items per category (trims oldest)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "webpack --mode production"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "18.x",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.1",
+    "@typescript-eslint/parser": "^6.19.1",
+    "@vscode/test-electron": "^2.3.8",
+    "eslint": "^8.56.0",
+    "glob": "^10.3.12",
+    "mocha": "^10.4.0",
+    "ts-loader": "^9.5.7",
+    "typescript": "^5.3.3",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4"
+  }
+}
