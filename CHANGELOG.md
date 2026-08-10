@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.0 - Icon
+
+### Changed
+- Changed the backgrounf of logo to transparent.
+
 ## 0.5.0 — Icon & polish
 
 ### Changed
