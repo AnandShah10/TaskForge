@@ -760,7 +760,7 @@ ${script}
         <h1>📊 Goals Dashboard</h1>
         <button id="btn-add-goal">+ Add Goal</button>
       </div>
-      <p class="tf-subtitle">Drag the sliders to update progress — changes save automatically.</p>
+      <p class="tf-subtitle">Visual progress tracking with donut + bar chart overview. Drag sliders to update (auto-saves).</p>
 
       <div id="add-form" class="tf-card" style="display:none;">
         <label for="new-title">Title</label>
@@ -771,6 +771,7 @@ ${script}
         </div>
       </div>
 
+      <div id="overview" class="tf-chart-overview"></div>
       <div id="goal-list"></div>
     `;
 
@@ -778,7 +779,43 @@ ${script}
       let goals = ${JSON.stringify(goals)};
       let saveTimer;
 
+      function getProgressClass(p) {
+        if (p >= 75) return 'high';
+        if (p >= 40) return 'medium';
+        return 'low';
+      }
+
+      function renderOverview() {
+        const overview = document.getElementById('overview');
+        if (goals.length === 0) {
+          overview.innerHTML = '<div style="color:var(--fg-secondary);padding:20px;text-align:center;">Add goals to see charts</div>';
+          return;
+        }
+        const avg = Math.round(goals.reduce((sum, g) => sum + g.progress, 0) / goals.length);
+        const barsHtml = goals.map(g => \`
+          <div class="tf-bar-row">
+            <div class="tf-bar-label" title="\${g.title}">\${g.title}</div>
+            <div class="tf-bar"><div class="tf-bar-fill" style="width:\${g.progress}%"></div></div>
+            <div style="width:42px;text-align:right;font-weight:600;color:var(--success)">\${g.progress}%</div>
+          </div>
+        \`).join('');
+
+        overview.innerHTML = \`
+          <div class="tf-donut" style="--progress-pct: \${avg}%;">
+            <div class="tf-donut-inner">
+              \${avg}<span style="font-size:0.5em;">%</span>
+              <div class="tf-donut-label">AVG</div>
+            </div>
+          </div>
+          <div style="flex:1;">
+            <div style="margin-bottom:12px;font-weight:600;color:var(--fg-secondary);">Progress Overview</div>
+            <div class="tf-bar-chart">\${barsHtml}</div>
+          </div>
+        \`;
+      }
+
       function render() {
+        renderOverview();
         const list = document.getElementById('goal-list');
         list.innerHTML = '';
         if (goals.length === 0) {
@@ -788,12 +825,13 @@ ${script}
         goals.forEach(goal => {
           const card = document.createElement('div');
           card.className = 'tf-card';
+          const progClass = getProgressClass(goal.progress);
           card.innerHTML = \`
             <div class="tf-card-header">
               <div style="flex:1;">
                 <div class="tf-card-title"></div>
                 <div class="tf-card-meta"></div>
-                <div class="tf-goal-bar-track"><div class="tf-goal-bar-fill" style="width:\${goal.progress}%"></div></div>
+                <div class="tf-goal-bar-track"><div class="tf-goal-bar-fill \${progClass}" style="width:\${goal.progress}%"></div></div>
                 <input type="range" min="0" max="100" value="\${goal.progress}" style="width:100%; margin-top:6px;">
               </div>
               <div class="tf-card-actions">
@@ -810,11 +848,13 @@ ${script}
           slider.addEventListener('input', () => {
             goal.progress = parseInt(slider.value, 10);
             fill.style.width = goal.progress + '%';
+            fill.className = 'tf-goal-bar-fill ' + getProgressClass(goal.progress);
             meta.textContent = goal.progress + '%' + (goal.deadline ? ' · due ' + goal.deadline : '');
             clearTimeout(saveTimer);
             saveTimer = setTimeout(() => {
               vscode.postMessage({ command: 'saveGoal', data: goal });
               tfToast('Progress updated');
+              renderOverview(); // refresh chart
             }, 400);
           });
           card.querySelector('[data-act="edit"]').addEventListener('click', () => {
