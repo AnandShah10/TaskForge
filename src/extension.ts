@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
-import { Todo, Note, Task, Goal, Plan, STORAGE_KEYS, ItemType } from './models';
+import {
+  Todo, Note, Task, Goal, Plan, Priority,
+  STORAGE_KEYS, VIEW_TYPE_TO_STORAGE_KEY, ItemType
+} from './models';
 import { TaskForgeProvider } from './taskForgeProvider';
 import { TaskForgeWebview } from './webview';
 
@@ -7,9 +10,9 @@ export function activate(context: vscode.ExtensionContext) {
   console.log('TaskForge is now active!');
 
   const storage = context.globalState;
-  const webviewManager = new TaskForgeWebview(context, storage);
 
-  // Initialize storage (as before)
+  // Trim each list down to the configured max, keeping the most recent
+  // items (new items are always unshifted to the front).
   const keys = Object.values(STORAGE_KEYS);
   keys.forEach(key => {
     let data: any[] = storage.get(key) || [];
@@ -18,13 +21,9 @@ export function activate(context: vscode.ExtensionContext) {
       data = data.slice(0, maxItems);
       storage.update(key, data);
     }
-    if (data.length === 0) {
-      storage.update(key, []);
-    }
   });
 
-  // Providers (add hubProvider)
-  const hubProvider = new TaskForgeProvider(storage, 'hub'); // Special for hub
+  const hubProvider = new TaskForgeProvider(storage, 'hub');
   const todosProvider = new TaskForgeProvider(storage, 'todos');
   const notesProvider = new TaskForgeProvider(storage, 'notes');
   const tasksProvider = new TaskForgeProvider(storage, 'tasks');
@@ -38,8 +37,25 @@ export function activate(context: vscode.ExtensionContext) {
   vscode.window.registerTreeDataProvider('goalsView', goalsProvider);
   vscode.window.registerTreeDataProvider('plansView', plansProvider);
 
-  // Enhanced commands to handle menu args (e.g., item for context)
-  const editItem = vscode.commands.registerCommand('taskForge.editItem', (itemId?: string, viewType?: string, item?: any) => {
+  // Silently refreshes the relevant tree view(s); called both from
+  // commands below and from the webview after it mutates storage directly.
+  function refreshProviders(viewType?: string) {
+    switch (viewType) {
+      case 'todos': todosProvider.refresh(); break;
+      case 'notes': notesProvider.refresh(); break;
+      case 'tasks': tasksProvider.refresh(); break;
+      case 'goals': goalsProvider.refresh(); break;
+      case 'plans': plansProvider.refresh(); break;
+      case 'hub': hubProvider.refresh(); break;
+      default:
+        todosProvider.refresh(); notesProvider.refresh(); tasksProvider.refresh();
+        goalsProvider.refresh(); plansProvider.refresh(); hubProvider.refresh();
+    }
+  }
+
+  const webviewManager = new TaskForgeWebview(context, storage, refreshProviders);
+
+  const editItem = vscode.commands.registerCommand('taskForge.editItem', (itemId?: string, viewType?: string) => {
     if (itemId && viewType) {
       webviewManager.show(viewType, itemId);
     } else {
@@ -47,28 +63,24 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  const deleteItem = vscode.commands.registerCommand('taskForge.deleteItem', (itemId?: string, viewType?: string, item?: any) => {
+  const deleteItem = vscode.commands.registerCommand('taskForge.deleteItem', (itemId?: string, viewType?: string) => {
     if (itemId && viewType) {
-      const key = STORAGE_KEYS[viewType as keyof typeof STORAGE_KEYS];
+      const key = VIEW_TYPE_TO_STORAGE_KEY[viewType];
+      if (!key) {
+        vscode.window.showErrorMessage(`Unknown item type: ${viewType}`);
+        return;
+      }
       const data: any[] = storage.get(key) || [];
       const updated = data.filter(i => i.id !== itemId);
       storage.update(key, updated);
-      // Refresh specific provider
-      switch (viewType) {
-        case 'todos': todosProvider.refresh(); break;
-        case 'notes': notesProvider.refresh(); break;
-        case 'tasks': tasksProvider.refresh(); break;
-        case 'goals': goalsProvider.refresh(); break;
-        case 'plans': plansProvider.refresh(); break;
-      }
+      refreshProviders(viewType);
       vscode.window.showInformationMessage(`Item deleted from ${viewType}.`);
     } else {
       vscode.window.showInformationMessage('Select an item to delete.');
     }
   });
 
-  // New toggle command for todos/tasks
-  const toggleItem = vscode.commands.registerCommand('taskForge.toggleItem', (itemId?: string, viewType?: string, item?: any) => {
+  const toggleItem = vscode.commands.registerCommand('taskForge.toggleItem', (itemId?: string, viewType?: string) => {
     if (itemId && (viewType === 'todos' || viewType === 'tasks')) {
       const key = viewType === 'todos' ? STORAGE_KEYS.TODOS : STORAGE_KEYS.TASKS;
       const data: any[] = storage.get(key) || [];
@@ -84,93 +96,98 @@ export function activate(context: vscode.ExtensionContext) {
         }
         (data[index] as any).updatedAt = new Date();
         storage.update(key, data);
-        // Refresh provider
-        (viewType === 'todos' ? todosProvider : tasksProvider).refresh();
-        vscode.window.showInformationMessage(`Item status toggled in ${viewType}.`);
+        refreshProviders(viewType);
       }
     } else {
       vscode.window.showInformationMessage('Select a todo or task to toggle.');
     }
   });
 
-  // Add commands (no args from menu; just prompt)
-  const addTodo = vscode.commands.registerCommand('taskForge.addTodo', async () => {
-    // Same as before (input box, add to storage, refresh)
-    const text = await vscode.window.showInputBox({ prompt: 'Enter todo text:' });
-    if (text) {
-      const todos: Todo[] = storage.get(STORAGE_KEYS.TODOS) || [];
-      const newTodo: Todo = {
-        id: Date.now().toString(),
-        text,
-        completed: false,
-        priority: 'medium',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      todos.unshift(newTodo);
-      storage.update(STORAGE_KEYS.TODOS, todos);
-      todosProvider.refresh();
-      if (vscode.workspace.getConfiguration('taskForge').get<boolean>('autoGitSync', false)) {
-        vscode.commands.executeCommand('taskForge.exportToGit');
-      }
-      vscode.window.showInformationMessage('Todo added!');
-    }
-  });
+  async function pickPriority(): Promise<Priority | undefined> {
+    const pick = await vscode.window.showQuickPick(
+      [
+        { label: '$(circle-filled) High', description: 'high' },
+        { label: '$(circle-outline) Medium', description: 'medium' },
+        { label: '$(circle-outline) Low', description: 'low' }
+      ],
+      { placeHolder: 'Priority' }
+    );
+    return pick?.description as Priority | undefined;
+  }
 
-  // Similar for other adds (addNote, addTask, addGoal, addPlan) - unchanged, but now callable from menus
+  const addTodo = vscode.commands.registerCommand('taskForge.addTodo', async () => {
+    const text = await vscode.window.showInputBox({ prompt: 'Enter todo text:', placeHolder: 'e.g. Reply to design review' });
+    if (!text) { return; }
+    const priority = (await pickPriority()) ?? 'medium';
+    const dueDate = await vscode.window.showInputBox({ prompt: 'Due date (YYYY-MM-DD, optional):' });
+
+    const todos: Todo[] = storage.get(STORAGE_KEYS.TODOS) || [];
+    const newTodo: Todo = {
+      id: Date.now().toString(),
+      text,
+      completed: false,
+      priority,
+      dueDate: dueDate || undefined,
+      tags: [],
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    todos.unshift(newTodo);
+    storage.update(STORAGE_KEYS.TODOS, todos);
+    refreshProviders('todos');
+    if (vscode.workspace.getConfiguration('taskForge').get<boolean>('autoGitSync', false)) {
+      vscode.commands.executeCommand('taskForge.exportToGit');
+    }
+    vscode.window.showInformationMessage('Todo added!');
+  });
 
   const addNote = vscode.commands.registerCommand('taskForge.addNote', async () => {
     const title = await vscode.window.showInputBox({ prompt: 'Note title:' });
-    const content = await vscode.window.showInputBox({ prompt: 'Note content:' });
-    if (title && content) {
-      const notes: Note[] = storage.get(STORAGE_KEYS.NOTES) || [];
-      const newNote: Note = { id: Date.now().toString(), title, content, tags: [], createdAt: new Date(), updatedAt: new Date(), pinned: false };
-      notes.unshift(newNote);
-      storage.update(STORAGE_KEYS.NOTES, notes);
-      notesProvider.refresh();
-      vscode.window.showInformationMessage('Note added!');
-    }
+    if (!title) { return; }
+    const content = await vscode.window.showInputBox({ prompt: 'Note content (you can add more detail later in the editor):' });
+    const notes: Note[] = storage.get(STORAGE_KEYS.NOTES) || [];
+    const newNote: Note = { id: Date.now().toString(), title, content: content ?? '', tags: [], createdAt: new Date(), updatedAt: new Date(), pinned: false };
+    notes.unshift(newNote);
+    storage.update(STORAGE_KEYS.NOTES, notes);
+    refreshProviders('notes');
+    vscode.window.showInformationMessage('Note added!');
   });
 
   const addTask = vscode.commands.registerCommand('taskForge.addTask', async () => {
     const desc = await vscode.window.showInputBox({ prompt: 'Task description:' });
-    if (desc) {
-      const tasks: Task[] = storage.get(STORAGE_KEYS.TASKS) || [];
-      const newTask: Task = { id: Date.now().toString(), description: desc, status: 'todo', assignee: '', dependencies: [], createdAt: new Date(), updatedAt: new Date() };
-      tasks.unshift(newTask);
-      storage.update(STORAGE_KEYS.TASKS, tasks);
-      tasksProvider.refresh();
-      vscode.window.showInformationMessage('Task added! Open Kanban to manage.');
-    }
+    if (!desc) { return; }
+    const priority = (await pickPriority()) ?? 'medium';
+    const tasks: Task[] = storage.get(STORAGE_KEYS.TASKS) || [];
+    const newTask: Task = { id: Date.now().toString(), description: desc, status: 'todo', priority, assignee: '', dependencies: [], createdAt: new Date(), updatedAt: new Date() };
+    tasks.unshift(newTask);
+    storage.update(STORAGE_KEYS.TASKS, tasks);
+    refreshProviders('tasks');
+    vscode.window.showInformationMessage('Task added! Open the Kanban board to manage it.');
   });
 
   const addGoal = vscode.commands.registerCommand('taskForge.addGoal', async () => {
     const title = await vscode.window.showInputBox({ prompt: 'Goal title:' });
+    if (!title) { return; }
     const progressStr = await vscode.window.showInputBox({ prompt: 'Progress (0-100):', value: '0' });
-    const progress = parseInt(progressStr || '0');
-    if (title && !isNaN(progress)) {
-      const goals: Goal[] = storage.get(STORAGE_KEYS.GOALS) || [];
-      const newGoal: Goal = { id: Date.now().toString(), title, description: '', progress, createdAt: new Date(), updatedAt: new Date() };
-      goals.unshift(newGoal);
-      storage.update(STORAGE_KEYS.GOALS, goals);
-      goalsProvider.refresh();
-      vscode.window.showInformationMessage('Goal added! View chart to track.');
-    }
+    const progress = Math.min(100, Math.max(0, parseInt(progressStr || '0', 10) || 0));
+    const goals: Goal[] = storage.get(STORAGE_KEYS.GOALS) || [];
+    const newGoal: Goal = { id: Date.now().toString(), title, description: '', progress, createdAt: new Date(), updatedAt: new Date() };
+    goals.unshift(newGoal);
+    storage.update(STORAGE_KEYS.GOALS, goals);
+    refreshProviders('goals');
+    vscode.window.showInformationMessage('Goal added! View the dashboard to track it.');
   });
 
   const addPlan = vscode.commands.registerCommand('taskForge.addPlan', async () => {
     const title = await vscode.window.showInputBox({ prompt: 'Plan title:' });
-    if (title) {
-      const plans: Plan[] = storage.get(STORAGE_KEYS.PLANS) || [];
-      const newPlan: Plan = { id: Date.now().toString(), title, steps: [], timeline: { start: '', end: '' }, createdAt: new Date(), updatedAt: new Date() };
-      plans.unshift(newPlan);
-      storage.update(STORAGE_KEYS.PLANS, plans);
-      plansProvider.refresh();
-      vscode.window.showInformationMessage('Plan added!');
-    }
+    if (!title) { return; }
+    const plans: Plan[] = storage.get(STORAGE_KEYS.PLANS) || [];
+    const newPlan: Plan = { id: Date.now().toString(), title, description: '', steps: [], timeline: { start: '', end: '' }, createdAt: new Date(), updatedAt: new Date() };
+    plans.unshift(newPlan);
+    storage.update(STORAGE_KEYS.PLANS, plans);
+    refreshProviders('plans');
+    vscode.window.showInformationMessage('Plan added! Open it to add steps.');
   });
-
-  // Kanban, Chart, Export, Import, Search, Refresh (unchanged, but now from menus)
 
   const openKanban = vscode.commands.registerCommand('taskForge.openKanban', () => {
     webviewManager.show('kanban');
@@ -181,7 +198,6 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   const exportToGit = vscode.commands.registerCommand('taskForge.exportToGit', async () => {
-    // Unchanged
     const data = {
       todos: storage.get(STORAGE_KEYS.TODOS),
       notes: storage.get(STORAGE_KEYS.NOTES),
@@ -199,7 +215,6 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   const importFromGit = vscode.commands.registerCommand('taskForge.importFromGit', async () => {
-    // Unchanged (with fixes)
     if (!vscode.workspace.workspaceFolders?.[0]) {
       vscode.window.showErrorMessage('No workspace open for import.');
       return;
@@ -209,67 +224,59 @@ export function activate(context: vscode.ExtensionContext) {
       const content = await vscode.workspace.fs.readFile(uri);
       const data = JSON.parse(content.toString());
       const dataTyped = data as Record<string, any[]>;
-      Object.entries(dataTyped).forEach(([key, items]) => {
-        if (Array.isArray(items) && STORAGE_KEYS[key as keyof typeof STORAGE_KEYS]) {
-          storage.update(key as keyof typeof STORAGE_KEYS, items);
+      Object.entries(dataTyped).forEach(([viewType, items]) => {
+        const key = VIEW_TYPE_TO_STORAGE_KEY[viewType];
+        if (Array.isArray(items) && key) {
+          storage.update(key, items);
         }
       });
-      todosProvider.refresh(); notesProvider.refresh(); tasksProvider.refresh(); goalsProvider.refresh(); plansProvider.refresh();
+      refreshProviders();
       vscode.window.showInformationMessage('Data imported from .taskforge.json!');
     } catch (err) {
-      vscode.window.showErrorMessage('Import failed: No .taskforge.json or invalid JSON.');
+      vscode.window.showErrorMessage('Import failed: no .taskforge.json found, or it contains invalid JSON.');
     }
   });
 
   const searchItems = vscode.commands.registerCommand('taskForge.searchItems', async () => {
-    // Unchanged
     const query = await vscode.window.showInputBox({ prompt: 'Search across items:' });
-    if (query) {
-      const todos: Todo[] = storage.get(STORAGE_KEYS.TODOS) || [];
-      const notes: Note[] = storage.get(STORAGE_KEYS.NOTES) || [];
-      const tasks: Task[] = storage.get(STORAGE_KEYS.TASKS) || [];
-      const goals: Goal[] = storage.get(STORAGE_KEYS.GOALS) || [];
-      const plans: Plan[] = storage.get(STORAGE_KEYS.PLANS) || [];
-      const allItems: ItemType[] = [...todos, ...notes, ...tasks, ...goals, ...plans];
-      const matches = allItems.filter(item => {
-        const text = (item as any).text || (item as any).title || (item as any).description || '';
-        return text.toLowerCase().includes(query.toLowerCase());
-      });
-      if (matches.length > 0) {
-        const choices = matches.map(item => ({ 
-          label: (item as any).text || (item as any).title || (item as any).description, 
-          description: item.id,
-          detail: `Type: ${(item as Todo).text ? 'Todo' : (item as Note).title ? 'Note' : (item as Task).description ? 'Task' : (item as Goal).title ? 'Goal' : 'Plan'}` 
-        }));
-        const choice = await vscode.window.showQuickPick(choices);
-        if (choice) {
-          vscode.commands.executeCommand('taskForge.editItem', choice.description, 'mixed');
-        }
-      } else {
-        vscode.window.showInformationMessage('No matches found.');
-      }
+    if (!query) { return; }
+    const todos: Todo[] = storage.get(STORAGE_KEYS.TODOS) || [];
+    const notes: Note[] = storage.get(STORAGE_KEYS.NOTES) || [];
+    const tasks: Task[] = storage.get(STORAGE_KEYS.TASKS) || [];
+    const goals: Goal[] = storage.get(STORAGE_KEYS.GOALS) || [];
+    const plans: Plan[] = storage.get(STORAGE_KEYS.PLANS) || [];
+    const allItems: ItemType[] = [...todos, ...notes, ...tasks, ...goals, ...plans];
+    const matches = allItems.filter(item => {
+      const text = (item as any).text || (item as any).title || (item as any).description || '';
+      return text.toLowerCase().includes(query.toLowerCase());
+    });
+    if (matches.length === 0) {
+      vscode.window.showInformationMessage('No matches found.');
+      return;
+    }
+    const typeOf = (item: any): string =>
+      todos.includes(item) ? 'Todo' : notes.includes(item) ? 'Note' : tasks.includes(item) ? 'Task' : goals.includes(item) ? 'Goal' : 'Plan';
+    const choices = matches.map(item => ({
+      label: (item as any).text || (item as any).title || (item as any).description,
+      description: item.id,
+      detail: `Type: ${typeOf(item)}`
+    }));
+    const choice = await vscode.window.showQuickPick(choices, { placeHolder: `${matches.length} match(es)` });
+    if (choice) {
+      vscode.commands.executeCommand('taskForge.editItem', choice.description, 'mixed');
     }
   });
 
   const refresh = vscode.commands.registerCommand('taskForge.refresh', (viewType?: string) => {
-    if (viewType) {
-      // Refresh specific if from menu
-      switch (viewType) {
-        case 'todos': todosProvider.refresh(); break;
-        case 'notes': notesProvider.refresh(); break;
-        case 'tasks': tasksProvider.refresh(); break;
-        case 'goals': goalsProvider.refresh(); break;
-        case 'plans': plansProvider.refresh(); break;
-        case 'hub': hubProvider.refresh(); break;
-      }
-    } else {
-      // All
-      todosProvider.refresh(); notesProvider.refresh(); tasksProvider.refresh(); goalsProvider.refresh(); plansProvider.refresh(); hubProvider.refresh();
-    }
+    refreshProviders(viewType);
     vscode.window.showInformationMessage('Views refreshed!');
   });
 
-  context.subscriptions.push(editItem, deleteItem, toggleItem, addTodo, addNote, addTask, addGoal, addPlan, openKanban, viewGoalsChart, exportToGit, importFromGit, searchItems, refresh);
+  context.subscriptions.push(
+    editItem, deleteItem, toggleItem,
+    addTodo, addNote, addTask, addGoal, addPlan,
+    openKanban, viewGoalsChart, exportToGit, importFromGit, searchItems, refresh
+  );
 }
 
 export function deactivate() {}
