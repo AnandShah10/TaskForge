@@ -2,7 +2,7 @@
   "name": "taskforge",
   "displayName": "TaskForge",
   "description": "A customizable productivity forge for tasks, todos, notes, goals, and plans with Kanban, charts, and Git sync.",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "AnandShah",
   "repository": {
     "type": "git",
@@ -37,7 +37,7 @@
         {
           "id": "taskForge",
           "title": "TaskForge",
-          "icon": "media/icon.png"
+          "icon": "media/icon.svg"
         }
       ]
     },

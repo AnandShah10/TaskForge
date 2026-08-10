@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 — Icon & polish
+
+### Changed
+- Activity bar icon updated to SVG (`media/icon.svg` using wrench design matching the 🛠️ branding). PNG is kept only for the Marketplace extension icon (as PNG does not render reliably in the activity bar).
+- Bumped version and updated changelog.
+
 ## 0.4.0 — UI/UX overhaul
 
 ### Fixed (functional bugs, not just cosmetic)
