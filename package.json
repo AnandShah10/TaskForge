@@ -1,6 +1,6 @@
 {
-  "name": "task-forge",
-  "displayName": "TaskForge",
+  "name": "taskforge",
+  "displayName": "Task Forge",
   "description": "A customizable productivity forge for tasks, todos, notes, goals, and plans with Kanban, charts, and Git sync.",
   "version": "1.0.1",
   "publisher": "AnandShah",
