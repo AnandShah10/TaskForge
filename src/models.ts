@@ -1,7 +1,6 @@
-// models.ts - Data model definitions shared across TaskForge
+// models.ts - Updated for TaskForge
 
 export type Priority = 'low' | 'medium' | 'high';
-export type TaskStatus = 'todo' | 'in-progress' | 'done';
 
 export interface Todo {
   id: string;
@@ -9,9 +8,9 @@ export interface Todo {
   completed: boolean;
   dueDate?: string;
   priority: Priority;
-  tags: string[];
-  createdAt: Date;
-  updatedAt: Date;
+  tags?: string[];
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export interface Note {
@@ -19,20 +18,20 @@ export interface Note {
   title: string;
   content: string;
   tags: string[];
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   pinned: boolean;
 }
 
 export interface Task {
   id: string;
   description: string;
-  status: TaskStatus;
-  priority: Priority;
+  status: 'todo' | 'in-progress' | 'done';
   assignee?: string;
+  priority: Priority;
   dependencies: string[];
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export interface Goal {
@@ -41,18 +40,18 @@ export interface Goal {
   description: string;
   progress: number;
   deadline?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export interface Plan {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   steps: string[];
   timeline: { start: string; end: string };
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export const STORAGE_KEYS = {
@@ -63,21 +62,18 @@ export const STORAGE_KEYS = {
   PLANS: 'taskForge.plans'
 } as const;
 
-// Maps the lowercase, plural viewType strings used throughout the tree
-// providers/commands directly to their storage key. This replaces the old
-// (broken) pattern of indexing STORAGE_KEYS with a lowercase key, which
-// silently failed because STORAGE_KEYS' own keys are uppercase.
-export const VIEW_TYPE_TO_STORAGE_KEY: Record<string, string> = {
-  todos: STORAGE_KEYS.TODOS,
-  notes: STORAGE_KEYS.NOTES,
-  tasks: STORAGE_KEYS.TASKS,
-  goals: STORAGE_KEYS.GOALS,
-  plans: STORAGE_KEYS.PLANS
+export const PRIORITY_ORDER: Record<Priority, number> = {
+  low: 0,
+  medium: 1,
+  high: 2
 };
 
-// Singular <-> plural mapping used by the webview to normalize the many
-// viewType spellings that flow in from tree items ('todos'), direct
-// commands ('kanban', 'goalsChart'), and single-item edits ('todo').
+export const PRIORITY_COLORS: Record<Priority, string> = {
+  low: 'charts.blue',
+  medium: 'charts.yellow',
+  high: 'charts.red'
+};
+
 export const SINGULAR_TO_PLURAL: Record<string, string> = {
   todo: 'todos',
   note: 'notes',
@@ -86,32 +82,44 @@ export const SINGULAR_TO_PLURAL: Record<string, string> = {
   plan: 'plans'
 };
 
-export type ItemType = Todo | Note | Task | Goal | Plan;
+export function formatDate(value?: Date | string): string {
+  if (!value) {
+    return '—';
+  }
 
-export const PRIORITY_ORDER: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
 
-export const PRIORITY_COLORS: Record<Priority, string> = {
-  high: 'charts.red',
-  medium: 'charts.yellow',
-  low: 'charts.green'
-};
-
-export function safeDate(value: unknown): Date | undefined {
-  if (!value) { return undefined; }
-  const d = new Date(value as string);
-  return isNaN(d.getTime()) ? undefined : d;
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
 }
 
-export function formatDate(value: unknown): string {
-  const d = safeDate(value);
-  return d ? d.toLocaleDateString() : 'Unknown';
-}
+export function isOverdue(date?: string): boolean {
+  if (!date) {
+    return false;
+  }
 
-export function isOverdue(dueDate?: string): boolean {
-  if (!dueDate) { return false; }
-  const d = safeDate(dueDate);
-  if (!d) { return false; }
+  const due = new Date(date);
+  if (Number.isNaN(due.getTime())) {
+    return false;
+  }
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  return d.getTime() < today.getTime();
+  return due < today;
 }
+
+export interface FullState {
+  todos: Todo[];
+  notes: Note[];
+  tasks: Task[];
+  goals: Goal[];
+  plans: Plan[];
+}
+
+export type ItemType = Todo | Note | Task | Goal | Plan;

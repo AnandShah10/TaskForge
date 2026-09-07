@@ -1,9 +1,35 @@
 # Changelog
 
+## 1.0.0 - React + Vite Migration (Complete)
+
+### Added
+- Full React 18 + TypeScript + Vite webview replacing the legacy vanilla implementation.
+- All views (Hub, Todos, Notes, Kanban/Tasks, Goals with Recharts, Plans) implemented as modular TSX components.
+- Shared components: Modal, RailNav, ToastContainer, useVSCodeMessage hook.
+- Advanced features: Drag-and-drop Kanban (@hello-pangea/dnd), interactive charts (Recharts), live Markdown preview, global search, optimistic updates.
+- Full VS Code theming support using design tokens in CSS.
+- Vite build integration for optimized assets and improved dev experience (HMR).
+
+### Changed
+- **Major rewrite**: `src/panel.ts` now serves React bundle from `out/webview/assets/index.js/css`. Legacy `panelHtml.ts` deprecated.
+- `FullState` interface exported from `models.ts`; TypeScript hardening across the board (no more loose `any[]`).
+- Build scripts updated to include `npm run build:webview` (Vite) in compile/package.
+- Sidebar stats and quick-add updated for new state.
+- Documentation (README, MIGRATION_REPORT) refreshed with screenshots, architecture details, and dev instructions.
+- Version bump and dependency updates (React, Recharts, lucide-react, etc.).
+- Removed obsolete settings (`taskForge.autoSave`, theme vars) and old CDN dependencies.
+
+### Fixed
+- All prior issues with editing, deleting, importing, offline support, and theming from v0.4.0–0.6.0.
+- Message routing now comprehensively covers every CRUD operation and view-specific actions (plan steps, etc.).
+- 100% feature parity with significant UX improvements (modals, toasts, responsive design).
+
+See [MIGRATION_REPORT.md](MIGRATION_REPORT.md) for the full migration story, file-by-file diffs, and benefits.
+
 ## 0.6.0 - Icon
 
 ### Changed
-- Changed the backgrounf of logo to transparent.
+- Changed the background of logo to transparent.
 
 ## 0.5.0 — Icon & polish
 
