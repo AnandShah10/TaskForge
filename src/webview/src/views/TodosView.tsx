@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FullState } from '../hooks/useVSCodeMessage';
 import { CheckSquare, Square, Trash2, Calendar, Flag } from 'lucide-react';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 interface TodosViewProps {
   state: FullState;
@@ -29,6 +30,7 @@ const TodosView: React.FC<TodosViewProps> = ({ state, searchTerm, onAction }) =>
   const [newPriority, setNewPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [newDueDate, setNewDueDate] = useState('');
   const [filter, setFilter] = useState<'all' | 'open' | 'completed'>('all');
+  const [deleteTodoId, setDeleteTodoId] = useState<string | null>(null);
 
   const todos = state.todos as Todo[];
 
@@ -67,9 +69,7 @@ const TodosView: React.FC<TodosViewProps> = ({ state, searchTerm, onAction }) =>
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Delete this todo?')) {
-      onAction('deleteTodo', { id });
-    }
+    setDeleteTodoId(id);
   };
 
   const handleUpdatePriority = (id: string, priority: 'high' | 'medium' | 'low') => {
@@ -208,6 +208,16 @@ const TodosView: React.FC<TodosViewProps> = ({ state, searchTerm, onAction }) =>
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={!!deleteTodoId}
+        message="Delete this todo? This action cannot be undone."
+        onCancel={() => setDeleteTodoId(null)}
+        onConfirm={() => {
+          if (deleteTodoId) onAction('deleteTodo', { id: deleteTodoId });
+          setDeleteTodoId(null);
+        }}
+      />
 
       {/* Summary footer */}
       <div style={{ 

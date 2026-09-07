@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.1 - UX Polish and Delete Confirmation
+
+### Changed
+- Redesigned the Notes create/edit experience with a clearer title field, pin and tag controls, Markdown editor/preview switch, and a larger writing surface.
+- Added responsive behavior for the Notes editor when the VS Code panel is narrow.
+- Restyled Goal and Plan delete actions as compact circular danger icon buttons.
+
+### Fixed
+- Registered the shared delete command used by legacy editor actions so deletes persist and refresh all views.
+- Replaced unsupported browser `confirm()` dialogs in the VS Code webview with an in-app confirmation modal for todos, notes, tasks, goals, plans, and plan steps.
+
 ## 1.0.0 - React + Vite Migration (Complete)
 
 ### Added

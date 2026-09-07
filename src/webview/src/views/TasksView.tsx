@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Plus, Trash2, User, Layout } from 'lucide-react';
 import Modal from '../components/Modal';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { FullState } from '../hooks/useVSCodeMessage';
 
 interface TasksViewProps {
@@ -25,6 +26,7 @@ const TasksView: React.FC<TasksViewProps> = ({ state, searchTerm, onAction }) =>
   const [editDesc, setEditDesc] = useState('');
   const [editAssignee, setEditAssignee] = useState('');
   const [editDeps, setEditDeps] = useState<string[]>([]);
+  const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
 
   // Filter and group tasks
   const filteredTasks = useMemo(() => {
@@ -86,9 +88,7 @@ const TasksView: React.FC<TasksViewProps> = ({ state, searchTerm, onAction }) =>
   };
 
   const handleDeleteTask = (id: string) => {
-    if (confirm('Delete this task?')) {
-      onAction('deleteTask', { id });
-    }
+    setDeleteTaskId(id);
   };
 
   const openEditModal = (task: any) => {
@@ -343,6 +343,16 @@ const TasksView: React.FC<TasksViewProps> = ({ state, searchTerm, onAction }) =>
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={!!deleteTaskId}
+        message="Delete this task? This action cannot be undone."
+        onCancel={() => setDeleteTaskId(null)}
+        onConfirm={() => {
+          if (deleteTaskId) onAction('deleteTask', { id: deleteTaskId });
+          setDeleteTaskId(null);
+        }}
+      />
 
       {filteredTasks.length === 0 && state.tasks.length > 0 && (
         <div className="empty-state" style={{ marginTop: '40px' }}>

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Trash2, Edit2, Target, Calendar } from 'lucide-react';
 import Modal from '../components/Modal';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { FullState } from '../hooks/useVSCodeMessage';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, 
@@ -22,6 +23,7 @@ const GoalsView: React.FC<GoalsViewProps> = ({ state, searchTerm, onAction }) =>
   const [editDesc, setEditDesc] = useState('');
   const [editProgress, setEditProgress] = useState(0);
   const [editDeadline, setEditDeadline] = useState('');
+  const [deleteGoalId, setDeleteGoalId] = useState<string | null>(null);
 
   // Filter goals
   const filteredGoals = useMemo(() => {
@@ -68,9 +70,7 @@ const GoalsView: React.FC<GoalsViewProps> = ({ state, searchTerm, onAction }) =>
   };
 
   const handleDeleteGoal = (id: string) => {
-    if (confirm('Delete this goal?')) {
-      onAction('deleteGoal', { id });
-    }
+    setDeleteGoalId(id);
   };
 
   const openEditModal = (goal: any) => {
@@ -271,8 +271,9 @@ const GoalsView: React.FC<GoalsViewProps> = ({ state, searchTerm, onAction }) =>
                 <Edit2 size={16} />
               </button>
               <button 
-                className="delete-btn"
+                className="icon-btn delete-btn card-delete-btn"
                 onClick={() => handleDeleteGoal(goal.id)}
+                title="Delete goal"
                 style={{ padding: '6px 10px', opacity: 0.7 }}
               >
                 <Trash2 size={16} />
@@ -367,6 +368,16 @@ const GoalsView: React.FC<GoalsViewProps> = ({ state, searchTerm, onAction }) =>
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={!!deleteGoalId}
+        message="Delete this goal? This action cannot be undone."
+        onCancel={() => setDeleteGoalId(null)}
+        onConfirm={() => {
+          if (deleteGoalId) onAction('deleteGoal', { id: deleteGoalId });
+          setDeleteGoalId(null);
+        }}
+      />
     </div>
   );
 };

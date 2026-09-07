@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { FullState } from '../hooks/useVSCodeMessage';
-import { FileText, Trash2, Pin, PinOff, Plus, Edit2 } from 'lucide-react';
+import { FileText, Trash2, Pin, PinOff, Plus, Edit2, Eye, PenLine } from 'lucide-react';
 import Modal from '../components/Modal';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 interface NotesViewProps {
   state: FullState;
@@ -29,6 +30,7 @@ const NotesView: React.FC<NotesViewProps> = ({ state, searchTerm, onAction }) =>
   const [noteTags, setNoteTags] = useState('');
   const [notePinned, setNotePinned] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
+  const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
 
   const notes = state.notes as Note[] || [];
 
@@ -111,9 +113,7 @@ const NotesView: React.FC<NotesViewProps> = ({ state, searchTerm, onAction }) =>
 
   const handleDeleteNote = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (confirm('Delete this note?')) {
-      onAction('deleteNote', { id });
-    }
+    setDeleteNoteId(id);
   };
 
   const togglePin = (id: string, e?: React.MouseEvent, currentPinned?: boolean) => {
@@ -206,7 +206,7 @@ const NotesView: React.FC<NotesViewProps> = ({ state, searchTerm, onAction }) =>
       <Modal
         isOpen={isModalOpen}
         onClose={closeModal}
-        title={modalMode === 'create' ? 'New Note' : 'Edit Note'}
+        title={modalMode === 'create' ? 'Create note' : 'Update note'}
         footer={
           <>
             <button className="btn secondary" onClick={closeModal}>
@@ -217,62 +217,75 @@ const NotesView: React.FC<NotesViewProps> = ({ state, searchTerm, onAction }) =>
               onClick={handleSaveNote}
               style={{ background: 'var(--accent)' }}
             >
-              {modalMode === 'create' ? 'Create Note' : 'Save Changes'}
+              {modalMode === 'create' ? 'Create note' : 'Save changes'}
             </button>
-            {modalMode === 'edit' && (
-              <button 
-                className="btn secondary" 
-                onClick={() => setPreviewMode(!previewMode)}
-                style={{ marginRight: 'auto' }}
-              >
-                {previewMode ? 'Edit' : 'Preview'}
-              </button>
-            )}
           </>
         }
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
+        <div className="note-editor">
           <input
+            className="note-title-input"
             type="text"
             value={noteTitle}
             onChange={(e) => setNoteTitle(e.target.value)}
-            placeholder="Note title..."
-            style={{ fontSize: '16px', fontWeight: 600, padding: '10px 12px' }}
+            placeholder="Give your note a clear title"
+            autoFocus
           />
-          
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
+
+          <div className="note-editor-meta">
+            <label className="note-pin-toggle">
               <input
                 type="checkbox"
                 checked={notePinned}
                 onChange={(e) => setNotePinned(e.target.checked)}
               />
-              Pin this note
+              <Pin size={14} />
+              Pin note
             </label>
-            
+
             <input
+              className="note-tags-input"
               type="text"
               value={noteTags}
               onChange={(e) => setNoteTags(e.target.value)}
-              placeholder="tags, comma, separated"
-              style={{ flex: 1, fontSize: '13px' }}
+              placeholder="Add tags, separated by commas"
             />
           </div>
 
+          <div className="note-editor-toolbar">
+            <span>{previewMode ? 'Preview' : 'Write'} · Markdown supported</span>
+            <button
+              className="icon-btn"
+              onClick={() => setPreviewMode(!previewMode)}
+              title={previewMode ? 'Edit note' : 'Preview note'}
+            >
+              {previewMode ? <PenLine size={15} /> : <Eye size={15} />}
+              <span>{previewMode ? 'Edit' : 'Preview'}</span>
+            </button>
+          </div>
+
           {previewMode ? (
-            <div className="note-preview">
-              {renderMarkdown(noteContent)}
-            </div>
+            <div className="note-preview note-editor-surface">{renderMarkdown(noteContent)}</div>
           ) : (
             <textarea
+              className="note-editor-surface note-content-input"
               value={noteContent}
               onChange={(e) => setNoteContent(e.target.value)}
-              placeholder="Write your note here... Markdown supported (# headers, **bold**, *italic*, - lists)"
-              style={{ flex: 1, fontFamily: 'var(--vscode-editor-font-family, monospace)', fontSize: '13.5px', lineHeight: '1.5' }}
+              placeholder="Start writing... Use headings, lists, bold text, and links to shape your note."
             />
           )}
         </div>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={!!deleteNoteId}
+        message="Delete this note? This action cannot be undone."
+        onCancel={() => setDeleteNoteId(null)}
+        onConfirm={() => {
+          if (deleteNoteId) onAction('deleteNote', { id: deleteNoteId });
+          setDeleteNoteId(null);
+        }}
+      />
     </div>
   );
 };

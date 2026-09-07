@@ -71,7 +71,12 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.showInformationMessage('TaskForge refreshed!');
   });
 
-  context.subscriptions.push(open, exportToGit, importFromGit, refresh);
+  const deleteItem = vscode.commands.registerCommand('taskForge.deleteItem', async (id: string, viewType: string) => {
+    await state.deleteItem(id, viewType);
+    refreshAll();
+  });
+
+  context.subscriptions.push(open, exportToGit, importFromGit, refresh, deleteItem);
 }
 
 export function deactivate() {}

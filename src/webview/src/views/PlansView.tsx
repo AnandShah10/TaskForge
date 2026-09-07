@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Trash2, Calendar, CheckSquare, Edit2 } from 'lucide-react';
 import Modal from '../components/Modal';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { FullState } from '../hooks/useVSCodeMessage';
 
 interface PlansViewProps {
@@ -19,6 +20,8 @@ const PlansView: React.FC<PlansViewProps> = ({ state, searchTerm, onAction }) =>
   const [editEnd, setEditEnd] = useState('');
   const [newStepText, setNewStepText] = useState('');
   const [selectedPlanForStep, setSelectedPlanForStep] = useState<string | null>(null);
+  const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
+  const [removeStepTarget, setRemoveStepTarget] = useState<{ planId: string; stepIndex: number } | null>(null);
 
   // Filter plans
   const filteredPlans = useMemo(() => {
@@ -45,9 +48,7 @@ const PlansView: React.FC<PlansViewProps> = ({ state, searchTerm, onAction }) =>
   };
 
   const handleDeletePlan = (id: string) => {
-    if (confirm('Delete this plan and all its steps?')) {
-      onAction('deletePlan', { id });
-    }
+    setDeletePlanId(id);
   };
 
   const openEditModal = (plan: any) => {
@@ -89,18 +90,11 @@ const PlansView: React.FC<PlansViewProps> = ({ state, searchTerm, onAction }) =>
   const toggleStep = (planId: string, stepIndex: number, currentSteps: string[]) => {
     // For simplicity, we don't have completed state on steps in model, so just remove or leave
     // To demonstrate, we'll remove completed steps (or could extend model but keep to current contract)
-    if (confirm('Mark step as completed and remove it?')) {
-      onAction('removePlanStep', { 
-        id: planId, 
-        stepIndex 
-      });
-    }
+    setRemoveStepTarget({ planId, stepIndex });
   };
 
   const removeStep = (planId: string, stepIndex: number) => {
-    if (confirm('Remove this step?')) {
-      onAction('removePlanStep', { id: planId, stepIndex });
-    }
+    setRemoveStepTarget({ planId, stepIndex });
   };
 
   return (
@@ -158,7 +152,7 @@ const PlansView: React.FC<PlansViewProps> = ({ state, searchTerm, onAction }) =>
                   <Edit2 size={16} />
                 </button>
                 <button 
-                  className="delete-btn"
+                  className="icon-btn delete-btn card-delete-btn"
                   onClick={() => handleDeletePlan(plan.id)}
                   title="Delete plan"
                 >
@@ -317,6 +311,28 @@ const PlansView: React.FC<PlansViewProps> = ({ state, searchTerm, onAction }) =>
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={!!deletePlanId}
+        message="Delete this plan and all its steps? This action cannot be undone."
+        onCancel={() => setDeletePlanId(null)}
+        onConfirm={() => {
+          if (deletePlanId) onAction('deletePlan', { id: deletePlanId });
+          setDeletePlanId(null);
+        }}
+      />
+
+      <ConfirmDialog
+        isOpen={!!removeStepTarget}
+        message="Remove this plan step?"
+        onCancel={() => setRemoveStepTarget(null)}
+        onConfirm={() => {
+          if (removeStepTarget) {
+            onAction('removePlanStep', removeStepTarget);
+          }
+          setRemoveStepTarget(null);
+        }}
+      />
     </div>
   );
 };
